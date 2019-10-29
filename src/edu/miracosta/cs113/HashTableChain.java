@@ -1,20 +1,15 @@
 package edu.miracosta.cs113;
 
-
-import java.util.LinkedList;
-import java.util.AbstractSet;
-import java.util.AbstractMap;
-import java.util.Map;
-import java.util.Iterator;
-import java.util.Set;
-import java.util.Hashtable;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 /**
- * HashTableChain.java:
+ * HashTableChain.java: A hash table data structure with chaining, where when a collusion occurs another node is added to
+ * the linked list stored in each table slot, there is only a linked list stored in that table slot if an Entry was first
+ * placed in that table slot.
  *
- * Class Invariant:
+ * Class Invariant: None
  *
  * @author        Brendan Devlin <Donttestturing@gmail.com>
  * @version       1.0
@@ -27,9 +22,14 @@ public class HashTableChain<K, V> extends AbstractMap<K, V> implements Map<K, V>
     //the capacity
     private static final int CAPACITY = 101;
     //the max load factor
-    private static final double LOAD_THRESHOLD = 3.0;                               //need to implement/override equals and
+    private static final double LOAD_THRESHOLD = 3.0;
 
 //inner class Entry
+    /**
+     * Inner class Entry, used in Entryset, representing key-value pairs in a hashtable
+     * @param <K> key of Entry
+     * @param <V> value of Entry
+     */
     private static class Entry<K, V> {
         //key
         private K key;
@@ -88,6 +88,9 @@ public class HashTableChain<K, V> extends AbstractMap<K, V> implements Map<K, V>
 
     }
 //inner class EntrySet
+    /**
+     * Inner class EntrySet, used to represent all entries in a hashtable as a Set
+     */
     private class EntrySet extends AbstractSet<Map.Entry<K, V>> {
         @Override
         public boolean remove(Object o) {
@@ -105,7 +108,6 @@ public class HashTableChain<K, V> extends AbstractMap<K, V> implements Map<K, V>
                 }
             }
             return false;
-
         }
         @Override
         public String toString(){
@@ -116,14 +118,15 @@ public class HashTableChain<K, V> extends AbstractMap<K, V> implements Map<K, V>
                     builder.append(", ");
                 }
                 if (table[i] != null) {
-                    builder.append(table[i].listIterator(0).next());
+                    ListIterator iter = table[i].listIterator();
+                    while(iter.hasNext()){
+                        builder.append(iter.next());
+                    }
                     second = true;
                 }
             }
-
             builder.append("]");
             return builder.toString();
-
         }
         @Override
         public void clear() {
@@ -134,72 +137,111 @@ public class HashTableChain<K, V> extends AbstractMap<K, V> implements Map<K, V>
         public Iterator<Map.Entry<K, V>> iterator() {
             return new SetIterator();
         }
-
         @Override
         public int size() {
             return numKeys;
         }
     }
 //inner class KeySey
+    /**
+     * Inner class KeySet, used to represent all key values in a hashtable as a set of keys
+     */
     private class KeySet extends AbstractSet<K> {
-    @Override
-    public String toString(){
-        StringBuilder sb = new StringBuilder("[");
-        boolean second = false;
-        for (int i = 0; i < table.length; i++) {
-            if (table[i] != null && second){
-                sb.append(", ");
+        @Override
+        public String toString(){
+            StringBuilder sb = new StringBuilder("[");
+            boolean second = false;
+            for (int i = 0; i < table.length; i++) {
+                if (table[i] != null && second){
+                    sb.append(", ");
+                }
+                if (table[i] != null) {
+                    ListIterator iter = table[i].listIterator();
+                    while(iter.hasNext()){
+                        Entry<K, V> e = (Entry<K, V>) iter.next();
+                        sb.append(e.getKey());
+                    }
+                    second = true;
+                }
             }
-            if (table[i] != null) {
-                sb.append(table[i].listIterator(0).next().getKey());
-                second = true;
-            }
+            sb.append("]");
+            return sb.toString();
         }
-        sb.append("]");
-        return sb.toString();
-
-        }
+        @Override
         public Iterator<K> iterator() {
             return new SetIterator();
         }
+        @Override
         public int size() {
             return numKeys;
         }
+        @Override
         public boolean contains(Object o) {
-
             if (get(o) != null){
                 return true;
             }
             return false;
-
-
         }
+        @Override
         public boolean remove(Object o) {
             return HashTableChain.this.remove(o) != null;
         }
+        @Override
         public void clear() {
             HashTableChain.this.clear();
         }
     }
 //inner class SetIterator
+    /**
+     * Inner class SetIterator, used to iterate over EntrySet, to move around a Set representation of the hash table
+     */
     public class SetIterator implements Iterator {
-
-        private Entry<K, V> nextItem;      // the current node
-        private Entry<K, V> lastItemReturned;   // the previous node
-        private int index;
+        private Entry<K, V> nextItem;      // the current item
+        private Entry<K, V> lastItemReturned;   // the previous item
+        private int index = 0;
+        ListIterator iter;// = table[index].listIterator();
 
         public SetIterator(){
             super();
         }
         @Override
         public boolean hasNext() {
-            return nextItem != null;
+            if (iter != null){
+                if (iter.hasNext()){
+                    return true;
+                } else {
+                    index++;
+                    iter = null;
+                }
+            }
+            while(index < table.length && table[index] == null){
+                index++;
+            }
+            if (index == table.length){
+                return false;
+            }
+            iter = table[index].listIterator();
+            return iter.hasNext();
         }
         @Override
         public Object next() {
             lastItemReturned = nextItem;
-            nextItem = (Entry<K, V>) entrySet().iterator().next();
-            index++;
+            if (iter != null){
+                if (iter.hasNext()){
+                    return iter.next();
+                } else {
+                    index++;
+                    iter = null;
+                }
+            }
+            while(index < table.length && table[index] == null){
+                index++;
+            }
+            if (index == table.length){
+                throw new NoSuchElementException();
+            }
+            iter = table[index].listIterator();
+            nextItem = (Entry<K, V>) iter.next();
             return nextItem;
         }
         @Override
@@ -209,17 +251,20 @@ public class HashTableChain<K, V> extends AbstractMap<K, V> implements Map<K, V>
     }
 
 //constructor
+
+    /**
+     * Constructor for HashTableChain, setting size of array to constant CAPACITY
+     */
     public HashTableChain(){
         table = new LinkedList[CAPACITY];
     }
-
 
 //methods
     @Override
     public String toString() {
         return entrySet().toString();
     }
-
+    @Override
     public int hashCode() {
         int hashCode = 1;
         for(LinkedList<Entry<K, V>> linkedList : table){
@@ -233,6 +278,7 @@ public class HashTableChain<K, V> extends AbstractMap<K, V> implements Map<K, V>
         }
         return hashCode;
     }
+    @Override
     public boolean equals(Object obj) {
        if (obj == null){
            return false;
@@ -241,11 +287,8 @@ public class HashTableChain<K, V> extends AbstractMap<K, V> implements Map<K, V>
        HashTableChain<K, V> t = new HashTableChain<>();
        t.putAll(ht);
 
-
        return this.hashCode() == t.hashCode();
-
     }
-
     @Override
     public V get(Object key){
         int index = key.hashCode() % table.length;
@@ -264,6 +307,7 @@ public class HashTableChain<K, V> extends AbstractMap<K, V> implements Map<K, V>
         //if reaching here, key is not in table
         return null;
     }
+    @Override
     public V put(K key, V value){
         int index = key.hashCode() % table.length;
         if (index < 0){
@@ -291,22 +335,27 @@ public class HashTableChain<K, V> extends AbstractMap<K, V> implements Map<K, V>
         }
         return null;
     }
-
+    /**
+     * Rehash method to expand table size when Load factor exceeds LOAD_THRESHOLD
+     */
     private void rehash() {
+        //save reference to old table
         LinkedList<Entry<K, V>>[] oldTable = table;
         table = new LinkedList[2 * table.length];
+        //reset numkeys to 0
         numKeys = 0;
+        //fill the new, larger table with the data in the old table
         for (LinkedList<Entry<K, V>> nextItem : oldTable)
             if (nextItem != null)
                 for (Entry<K, V> e : nextItem)
                     put(e.key, e.value);
     }
-
 //entrySet method
     @Override
     public Set<Map.Entry<K, V>> entrySet() {
         return new EntrySet();
     }
+//keySet method
     @Override
     public Set<K> keySet(){
         return new KeySet();
